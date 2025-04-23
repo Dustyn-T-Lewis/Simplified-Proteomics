@@ -1,7 +1,7 @@
 # ---- 0. Load Required Libraries ----
 required_packages <- c(
   "readxl", "stringr", "tidyr", "httr", "jsonlite", "purrr",
-  "tibble", "ggplot2", "forcats", "dplyr", "BiocManager"
+  "tibble", "ggplot2", "forcats", "dplyr", "ggpubr", "BiocManager"
 )
 
 # Install and load required libraries
@@ -189,7 +189,47 @@ plot_bar <- function(data, pathway_name) {
     )
 }
 
-# ---- 7. Generate Bar Plots ----
+# ---- 7. Calculate Significance Values ----
+calculate_significance <- function(categories, data) {
+  purrr::imap_dfr(categories, function(genes, module) {
+    df <- dplyr::filter(data, Gene_Symbol %in% genes)
+  # 1. Pre vs Post within MA
+    df_pp <- dplyr::filter(df, Group == "MA", Timepoint %in% c("Pre","Post"))
+    p_pp <- if (length(unique(df_pp$Timepoint))==2) {
+      t.test(Abundance ~ Timepoint, df_pp)$p.value
+    } else NA_real_
+  # 2. Young vs Pre
+    df_yp <- dplyr::filter(df, Group == "Young" | (Group=="MA" & Timepoint=="Pre"))
+    p_yp <- if (length(unique(df_yp$Group))==2) {
+      t.test(Abundance ~ Group, df_yp)$p.value
+    } else NA_real_
+  # 3. Young vs Post
+    df_ypo <- dplyr::filter(df, Group == "Young" | (Group=="MA" & Timepoint=="Post"))
+    p_ypo <- if (length(unique(df_ypo$Group))==2) {
+      t.test(Abundance ~ Group, df_ypo)$p.value
+    } else NA_real_
+    
+    tibble::tibble(
+      Pathway_Module   = module,
+      p_Pre_vs_Post    = p_pp,
+      p_Young_vs_Pre   = p_yp,
+      p_Young_vs_Post  = p_ypo
+    )
+  }) %>%
+  # Benjamini–Hochberg FDR correction column of p-values
+  dplyr::mutate(dplyr::across(dplyr::starts_with("p_"),
+                              ~ p.adjust(., method = "BH"),
+                              .names = "{.col}_adj"))
+}
+# Apply to each major pathway
+signif_oxidative  <- calculate_significance(categories$Oxidative_Damage,long_df)
+signif_antiox     <- calculate_significance(categories$Antioxidant_Response,long_df)
+signif_er_up       <- calculate_significance(categories$ER_Stress_UPR,long_df)
+signif_protsyn    <- calculate_significance(categories$Protein_Synthesis,long_df)
+signif_proteolysis<- calculate_significance(categories$Proteolysis,long_df)
+signif_mitoqc     <- calculate_significance(categories$Mitochondrial_Homeostasis,long_df)
+
+# ---- 8. Generate Bar Plots ----
 groups <- c("Young", "Pre", "Post")
 colors <- c("#1b9e77", "#d95f02", "#7570b3")
 group_order <- c("Young", "Pre", "Post")
@@ -199,11 +239,3 @@ data_antioxidant_response <- calculate_pathway_data(categories$Antioxidant_Respo
 data_er_stress_upr <- calculate_pathway_data(categories$ER_Stress_UPR, long_df)
 data_protein_synthesis <- calculate_pathway_data(categories$Protein_Synthesis, long_df)
 data_proteostasis <- calculate_pathway_data(categories$Proteostasis, long_df)
-data_mitochondrial_homeostasis <- calculate_pathway_data(categories$Mitochondrial_Homeostasis, long_df)
-
-plot_bar(data_oxidative_damage, "Oxidative Damage & Redox Signaling")
-plot_bar(data_antioxidant_response, "Antioxidant Response")
-plot_bar(data_er_stress_upr, "ER Stress & UPR Outcome")
-plot_bar(data_protein_synthesis, "Translational Control (mTOR Axis)")
-plot_bar(data_proteostasis, "Proteostasis & Clearance")
-plot_bar(data_mitochondrial_homeostasis, "Mitochondrial Quality Control")
