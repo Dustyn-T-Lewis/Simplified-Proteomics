@@ -625,112 +625,79 @@ signif_mitoqc     <- calculate_significance(categories$Mitochondrial_Quality_Con
 
 ---
 
-## SECTION 8: Significance Calculations
+## SECTION 8: Bar Plot and P-value table
 
 *Purpose*
 
-- Defines a single function that runs three pairwise t-tests (Pre vs Post in MA, Young vs Pre, Young vs Post), corrects all p-values for false discovery (Benjamini–Hochberg), and returns a tidy table of raw and adjusted p’s for every sub-pathway module. Then applies it to each of the six major pathways.
+- # Loop over each major pathway to draw its bar plot and print the module (pathway/categoy)‐level p‐values.
 
 ```{r}
-# ---- 7. Calculate Significance Values ----
-calculate_significance <- function(categories, data) {
-  purrr::imap_dfr(categories, function(genes, module) {
-    df <- dplyr::filter(data, Gene_Symbol %in% genes)
-  # 1. Pre vs Post within MA
-    df_pp <- dplyr::filter(df, Group == "MA", Timepoint %in% c("Pre","Post"))
-    p_pp <- if (length(unique(df_pp$Timepoint))==2) {
-      t.test(Abundance ~ Timepoint, df_pp)$p.value
-    } else NA_real_
-  # 2. Young vs Pre
-    df_yp <- dplyr::filter(df, Group == "Young" | (Group=="MA" & Timepoint=="Pre"))
-    p_yp <- if (length(unique(df_yp$Group))==2) {
-      t.test(Abundance ~ Group, df_yp)$p.value
-    } else NA_real_
-  # 3. Young vs Post
-    df_ypo <- dplyr::filter(df, Group == "Young" | (Group=="MA" & Timepoint=="Post"))
-    p_ypo <- if (length(unique(df_ypo$Group))==2) {
-      t.test(Abundance ~ Group, df_ypo)$p.value
-    } else NA_real_
-    
-    tibble::tibble(
-      Pathway_Module   = module,
-      p_Pre_vs_Post    = p_pp,
-      p_Young_vs_Pre   = p_yp,
-      p_Young_vs_Post  = p_ypo
-    )
-  }) %>%
-  # Benjamini–Hochberg FDR correction column of p-values
-  dplyr::mutate(dplyr::across(dplyr::starts_with("p_"),
-                              ~ p.adjust(., method = "BH"),
-                              .names = "{.col}_adj"))
-}
-# Apply to each major pathway
-signif_oxidative  <- calculate_significance(categories$Oxidative_Damage,          long_df)
-signif_antiox     <- calculate_significance(categories$Antioxidant_Response,       long_df)
-signif_er_up       <- calculate_significance(categories$ER_Stress_and_UPR,          long_df)
-signif_protsyn    <- calculate_significance(categories$Protein_Synthesis,         long_df)
-signif_proteolysis<- calculate_significance(categories$Proteolysis,              long_df)
-signif_mitoqc     <- calculate_significance(categories$Mitochondrial_Quality_Control, long_df)
+ ---- 8. Generate Bar Plots & Print Significance ----
+
+# List of pathway data objects
+pathway_data <- list(
+  "Oxidative Damage & Redox"    = calculate_pathway_data(categories$Oxidative_Damage,    long_df),
+  "Antioxidant Response"         = calculate_pathway_data(categories$Antioxidant_Response,  long_df),
+  "ER Stress & UPR Outcome"      = calculate_pathway_data(categories$ER_Stress_UPR,       long_df),
+  "Translational Control (mTOR)" = calculate_pathway_data(categories$Protein_Synthesis,    long_df),
+  "Proteostasis & Clearance"     = calculate_pathway_data(categories$Proteostasis,       long_df),
+  "Mitochondrial Quality Ctrl"   = calculate_pathway_data(categories$Mitochondrial_Homeostasis, long_df)
+)
+
+# Corresponding significance tables
+sig_tables <- list(
+  "Oxidative Damage & Redox"    = signif_oxidative,
+  "Antioxidant Response"         = signif_antiox,
+  "ER Stress & UPR Outcome"      = signif_er_up,
+  "Translational Control (mTOR)" = signif_protsyn,
+  "Proteostasis & Clearance"     = signif_proteolysis,
+  "Mitochondrial Quality Ctrl"   = signif_mitoqc
+)
+
+# Loop pathway, plot bar chart, then print p-values
+purrr::walk(names(pathway_data), function(name) {
+  plt <- plot_bar(pathway_data[[name]], name)   # draw the bar plot
+  print(plt)                                    # display it
+  cat("\nModule‐level p‐values for", name, ":\n") 
+  print(sig_tables[[name]])                     # show the stats table
+})
 
 ```
 
 *Step-by-Step Breakdown*
 
-1. `calculate_significance <- function(categories, data) { … }`  
+1. `pathway_data <- list(...)`  
 
-- Defines a function that takes your list of gene‐sets and the long‐format data, then returns a table of raw and adjusted p-values for each sub-pathway.
+- Build a named list where each entry holds the mean‐abundance matrices (raw + normalized) for one major pathway by calling `calculate_pathway_data()` on your categories.
 
-2. `purrr::imap_dfr(categories, function(genes, module) { … })`  
+2. `sig_tables <- list(...)`  
 
-- Iterates over each element of `categories`, with `genes` = gene vector and `module` = its name, then row-binds the results.
+- Create a matching named list of significance tables (`data.frame`s of p-values) for each pathway.
 
-3. `df <- data %>% filter(Gene_Symbol %in% genes)`  
+3. `purrr::walk(names(pathway_data), function(name) { … })`  
 
-- Subsets the data to only those rows corresponding to the current module’s genes.
+- Loop over each pathway name, running the anonymous function on every element of `pathway_data`.
 
-4. `df_pp <- df %>% filter(Group == "MA", Timepoint %in% c("Pre","Post"))`  
+4. `plt <- plot_bar(pathway_data[[name]], name)`  
 
-- Further filters to middle-aged (MA) Pre vs Post samples.
+- Inside the loop: generate the faceted bar chart for the current pathway’s raw abundance matrix.
 
-5. `p_pp <- if (length(unique(df_pp$Timepoint)) == 2) t.test(Abundance ~ Timepoint, df_pp)$p.value else NA_real_`  
+5. `print(plt)`  
 
-- Runs a Pre vs Post t-test if both timepoints exist; otherwise sets `NA`.
+- Display the bar chart in the R plotting window.
 
-6. `df_yp <- df %>% filter(Group == "Young" | (Group == "MA" & Timepoint == "Pre"))`  
+6. `cat("\nModule-level p-values for", name, ":\n")`  
 
-- Subsets to Young vs MA-Pre samples.
+- Print a header announcing which pathway’s module p-values are coming next.
 
-7. `p_yp <- if (length(unique(df_yp$Group)) == 2) t.test(Abundance ~ Group, df_yp)$p.value else NA_real_`  
+7. `print(sig_tables[[name]])`  
 
-- Runs a Young vs Pre t-test if both groups exist.
-
-8. `df_ypo <- df %>% filter(Group == "Young" | (Group == "MA" & Timepoint == "Post"))`  
-
-- Subsets to Young vs MA-Post samples.
-
-9. `p_ypo <- if (length(unique(df_ypo$Group)) == 2) t.test(Abundance ~ Group, df_ypo)$p.value else NA_real_`  
-
-- Runs a Young vs Post t-test if both groups exist.
-
-10. `tibble::tibble(Pathway_Module = module, p_Pre_vs_Post = p_pp, p_Young_vs_Pre = p_yp, p_Young_vs_Post = p_ypo)`  
-
-- Creates a one-row tibble containing the module name and the three raw p-values.
-
-11. `dplyr::mutate(dplyr::across(dplyr::starts_with("p_"), ~ p.adjust(., method = "BH"), .names = "{.col}_adj"))`  
-
-- Adjusts each raw p-value column using the Benjamini–Hochberg FDR method, appending `_adj`.
-
-12. `signif_ ...  <- calculate_significance(categories$ ...,          long_df)`
-
-- Applies the function to each of the six major pathway lists, storing results in separate objects.
-
+- Print the data frame of module-level significance results for that pathway. 
 
 *Key Packages*
 
-- purrr: for `imap_dfr()` iteration and binding results.
+- purrr: for `walk()`, to loop without returning a value.
 
-- dplyr: for filtering, mutating, and p-value adjustment.
+- ggplot2: for plotting inside `plot_bar()`.
 
-- tibble: for creating tidy result tibbles.
-
-- stats: for `t.test()`.
+- dplyr, tidyr, tibble: used earlier to shape data passed into these functions.

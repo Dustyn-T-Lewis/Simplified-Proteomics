@@ -239,3 +239,28 @@ data_antioxidant_response <- calculate_pathway_data(categories$Antioxidant_Respo
 data_er_stress_upr <- calculate_pathway_data(categories$ER_Stress_UPR, long_df)
 data_protein_synthesis <- calculate_pathway_data(categories$Protein_Synthesis, long_df)
 data_proteostasis <- calculate_pathway_data(categories$Proteostasis, long_df)
+data_mitochondrial_homeostasis <- calculate_pathway_data(categories$Mitochondrial_Homeostasis, long_df)
+
+plot_bar(data_oxidative_damage, "Oxidative Damage & Redox Signaling")
+print("Significance Table: Oxidative Damage")
+print(significance_oxidative_damage)
+
+plot_bar(data_antioxidant_response, "Antioxidant Response")
+print("Significance Table: Antioxidant Response")
+print(significance_antioxidant_response)
+
+plot_bar(data_er_stress_upr, "ER Stress & UPR Outcome")
+print("Significance Table: ER Stress UPR")
+print(significance_er_stress_upr)
+
+plot_bar(data_protein_synthesis, "Translational Control (mTOR Axis)")
+print("Significance Table: Protein Synthesis")
+print(significance_protein_synthesis)
+
+plot_bar(data_proteostasis, "Proteostasis & Clearance")
+print("Significance Table: Proteostasis")
+print(significance_proteostasis)
+
+plot_bar(data_mitochondrial_homeostasis, "Mitochondrial Quality Control")
+print("Significance Table: Mitochondrial Homeostasis")
+print(significance_mitochondrial_homeostasis)
