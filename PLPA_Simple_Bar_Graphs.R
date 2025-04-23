@@ -229,38 +229,35 @@ signif_protsyn    <- calculate_significance(categories$Protein_Synthesis,long_df
 signif_proteolysis<- calculate_significance(categories$Proteolysis,long_df)
 signif_mitoqc     <- calculate_significance(categories$Mitochondrial_Homeostasis,long_df)
 
-# ---- 8. Generate Bar Plots ----
-groups <- c("Young", "Pre", "Post")
-colors <- c("#1b9e77", "#d95f02", "#7570b3")
-group_order <- c("Young", "Pre", "Post")
+# ---- 8. Generate Bar Plots & Print Significance ----
 
-data_oxidative_damage <- calculate_pathway_data(categories$Oxidative_Damage, long_df)
-data_antioxidant_response <- calculate_pathway_data(categories$Antioxidant_Response, long_df)
-data_er_stress_upr <- calculate_pathway_data(categories$ER_Stress_UPR, long_df)
-data_protein_synthesis <- calculate_pathway_data(categories$Protein_Synthesis, long_df)
-data_proteostasis <- calculate_pathway_data(categories$Proteostasis, long_df)
-data_mitochondrial_homeostasis <- calculate_pathway_data(categories$Mitochondrial_Homeostasis, long_df)
+# 8a) Prepare a named list of pathway data objects
+pathway_data <- list(
+  "Oxidative Damage & Redox"   = calculate_pathway_data(categories$Oxidative_Damage,    long_df),
+  "Antioxidant Response"        = calculate_pathway_data(categories$Antioxidant_Response,  long_df),
+  "ER Stress & UPR Outcome"     = calculate_pathway_data(categories$ER_Stress_UPR,       long_df),
+  "Translational Control (mTOR)"= calculate_pathway_data(categories$Protein_Synthesis,    long_df),
+  "Proteostasis & Clearance"    = calculate_pathway_data(categories$Proteostasis,       long_df),
+  "Mitochondrial Quality Ctrl"  = calculate_pathway_data(categories$Mitochondrial_Homeostasis, long_df)
+)
 
-plot_bar(data_oxidative_damage, "Oxidative Damage & Redox Signaling")
-print("Significance Table: Oxidative Damage")
-print(significance_oxidative_damage)
+# 8b) Corresponding significance tables (from step 7)
+sig_tables <- list(
+  "Oxidative Damage & Redox"   = signif_oxidative,
+  "Antioxidant Response"        = signif_antiox,
+  "ER Stress & UPR Outcome"     = signif_er_up,
+  "Translational Control (mTOR)"= signif_protsyn,
+  "Proteostasis & Clearance"    = signif_proteolysis,
+  "Mitochondrial Quality Ctrl"  = signif_mitoqc
+)
 
-plot_bar(data_antioxidant_response, "Antioxidant Response")
-print("Significance Table: Antioxidant Response")
-print(significance_antioxidant_response)
-
-plot_bar(data_er_stress_upr, "ER Stress & UPR Outcome")
-print("Significance Table: ER Stress UPR")
-print(significance_er_stress_upr)
-
-plot_bar(data_protein_synthesis, "Translational Control (mTOR Axis)")
-print("Significance Table: Protein Synthesis")
-print(significance_protein_synthesis)
-
-plot_bar(data_proteostasis, "Proteostasis & Clearance")
-print("Significance Table: Proteostasis")
-print(significance_proteostasis)
-
-plot_bar(data_mitochondrial_homeostasis, "Mitochondrial Quality Control")
-print("Significance Table: Mitochondrial Homeostasis")
-print(significance_mitochondrial_homeostasis)
+# 8c) Loop over each pathway: plot + print its significance table
+walk(names(pathway_data), function(name) {
+  # plot the bar chart
+  plt <- plot_bar(pathway_data[[name]], name)
+  print(plt)
+  
+  # print the module‐level p‐values
+  cat("\nModule‐level p‐values for", name, ":\n")
+  print(sig_tables[[name]])
+})
